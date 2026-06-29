@@ -2,8 +2,8 @@ open! Core
 
 module Request = struct
   type t =
-    { symbol : Symbol.t
-    ; participant : Participant.t
+    { client_order_id : Client_order_id.t
+    ; symbol : Symbol.t
     ; side : Side.t
     ; price : Price.t
     ; size : Size.t
@@ -11,17 +11,19 @@ module Request = struct
     }
   [@@deriving sexp, bin_io]
 
-  let to_string { symbol; participant; side; price; size; time_in_force } =
+  let to_string { client_order_id; symbol; side; price; size; time_in_force }
+    =
     let price = Price.to_string_dollar price in
     let size = Size.to_int size in
     [%string
-      "%{side#Side} %{symbol#Symbol} %{size#Int}@%{price} \
-       %{time_in_force#Time_in_force} as %{participant#Participant}"]
+      "%{side#Side} %{client_order_id#Client_order_id} %{symbol#Symbol} \
+       %{size#Int}@%{price} %{time_in_force#Time_in_force}"]
   ;;
 end
 
 type t =
   { order_id : Order_id.t
+  ; client_order_id : Client_order_id.t
   ; symbol : Symbol.t
   ; participant : Participant.t
   ; side : Side.t
@@ -34,6 +36,7 @@ type t =
 
 let to_string
   ({ order_id
+   ; client_order_id
    ; symbol = _
    ; participant
    ; side = _
@@ -47,18 +50,20 @@ let to_string
   let price = Price.to_string_dollar price in
   let size = Size.to_int remaining_size in
   [%string
-    "%{price} x%{size#Int} (id=%{order_id#Order_id}, \
+    "%{price} x%{size#Int} (server_id=%{order_id#Order_id}, \
+     client_id=%{client_order_id#Client_order_id}, \
      %{participant#Participant})"]
 ;;
 
-let create (req : Request.t) ~order_id =
+let create (req : Request.t) ~order_id ~participant =
   if Size.( <= ) req.size Size.zero
   then
     raise_s
       [%message "Order.create: size must be positive" (req.size : Size.t)];
   { order_id
+  ; client_order_id = req.client_order_id
   ; symbol = req.symbol
-  ; participant = req.participant
+  ; participant
   ; side = req.side
   ; price = req.price
   ; size = req.size
@@ -68,6 +73,7 @@ let create (req : Request.t) ~order_id =
 ;;
 
 let order_id t = t.order_id
+let client_order_id t = t.client_order_id
 let symbol t = t.symbol
 let participant t = t.participant
 let side t = t.side

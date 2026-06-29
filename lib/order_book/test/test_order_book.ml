@@ -12,8 +12,8 @@ let make_order
   ()
   =
   Order.create
-    ({ symbol = Harness.aapl
-     ; participant
+    ({ client_order_id = Client_order_id.of_int order_id
+     ; symbol = Harness.aapl
      ; side
      ; price = Price.of_int_cents price_cents
      ; size = Size.of_int size
@@ -21,6 +21,7 @@ let make_order
      }
      : Order.Request.t)
     ~order_id:(Order_id.For_testing.of_int order_id)
+    ~participant
 ;;
 
 (* --- add / find / remove --- *)

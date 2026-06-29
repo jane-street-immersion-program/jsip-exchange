@@ -4,16 +4,16 @@ open Expect_test_helpers_core
 
 let make_request
   ?(symbol = "AAPL")
-  ?(participant = "Alice")
   ?(side = Side.Buy)
   ?(price_cents = 15000)
   ?(size = 100)
   ?(time_in_force = Time_in_force.Day)
+  ?(client_order_id = 1)
   ()
   : Order.Request.t
   =
-  { symbol = Symbol.of_string symbol
-  ; participant = Participant.of_string participant
+  { client_order_id = Client_order_id.of_int client_order_id
+  ; symbol = Symbol.of_string symbol
   ; side
   ; price = Price.of_int_cents price_cents
   ; size = Size.of_int size
@@ -23,7 +23,7 @@ let make_request
 
 let make_order
   ?symbol
-  ?participant
+  ?(participant = "Alice")
   ?side
   ?price_cents
   ?size
@@ -32,15 +32,9 @@ let make_order
   =
   let gen = Order_id.Generator.create () in
   Order.create
-    (make_request
-       ?symbol
-       ?participant
-       ?side
-       ?price_cents
-       ?size
-       ?time_in_force
-       ())
+    (make_request ?symbol ?side ?price_cents ?size ?time_in_force ())
     ~order_id:(Order_id.Generator.next gen)
+    ~participant:(Participant.of_string participant)
 ;;
 
 let%expect_test "create: remaining_size starts equal to size" =

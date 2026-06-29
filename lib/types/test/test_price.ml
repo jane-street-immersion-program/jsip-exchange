@@ -74,3 +74,57 @@ let%expect_test "negative to_string_dollar" =
   print_endline (Price.to_string_dollar (Price.of_int_cents (-150)));
   [%expect {| -$1.50 |}]
 ;;
+
+let%test_unit "is_more_aggressive: basic cases" =
+  let a = Price.of_int_cents 2 in
+  let b = Price.of_int_cents 1 in
+  [%test_result: bool]
+    (Price.is_more_aggressive Buy ~price:a ~than:b)
+    ~expect:true;
+  [%test_result: bool]
+    (Price.is_more_aggressive Buy ~price:b ~than:a)
+    ~expect:false;
+  [%test_result: bool]
+    (Price.is_more_aggressive Sell ~price:b ~than:a)
+    ~expect:true;
+  [%test_result: bool]
+    (Price.is_more_aggressive Sell ~price:a ~than:b)
+    ~expect:false
+;;
+
+let%test_unit "is_more_aggressive: equal prices" =
+  let p = Price.of_int_cents 100 in
+  [%test_result: bool]
+    (Price.is_more_aggressive Buy ~price:p ~than:p)
+    ~expect:false;
+  [%test_result: bool]
+    (Price.is_more_aggressive Sell ~price:p ~than:p)
+    ~expect:false
+;;
+
+let%test_unit "is_marketable: basic cases" =
+  let a = Price.of_int_cents 2 in
+  let b = Price.of_int_cents 1 in
+  [%test_result: bool]
+    (Price.is_marketable Buy ~price:a ~resting_price:b)
+    ~expect:true;
+  [%test_result: bool]
+    (Price.is_marketable Buy ~price:b ~resting_price:a)
+    ~expect:false;
+  [%test_result: bool]
+    (Price.is_marketable Sell ~price:b ~resting_price:a)
+    ~expect:true;
+  [%test_result: bool]
+    (Price.is_marketable Sell ~price:a ~resting_price:b)
+    ~expect:false
+;;
+
+let%test_unit "is_marketable: equal prices" =
+  let p = Price.of_int_cents 100 in
+  [%test_result: bool]
+    (Price.is_marketable Buy ~price:p ~resting_price:p)
+    ~expect:true;
+  [%test_result: bool]
+    (Price.is_marketable Sell ~price:p ~resting_price:p)
+    ~expect:true
+;;

@@ -54,14 +54,15 @@ let book_with_n_asks ?(min_price = 10_000) n =
   for i = 1 to n do
     let order =
       Order.create
-        { symbol = aapl
-        ; participant = bob
+        { client_order_id = Client_order_id.of_int i
+        ; symbol = aapl
         ; side = Sell
         ; price = Price.of_int_cents (min_price + i)
         ; size = Size.of_int 100
         ; time_in_force = Day
         }
         ~order_id:(Order_id.Generator.next gen)
+        ~participant:bob
     in
     Order_book.add book order
   done;
@@ -75,8 +76,9 @@ let engine_with_n_asks ?(min_price = 10_000) n =
     ignore
       (Matching_engine.submit
          engine
-         { symbol = aapl
-         ; participant = bob
+         ~participant:bob
+         { client_order_id = Client_order_id.of_int i
+         ; symbol = aapl
          ; side = Sell
          ; price = Price.of_int_cents (min_price + i)
          ; size = Size.of_int 100
@@ -97,14 +99,15 @@ let bench_find_match ~n =
   (* Incoming buy at a price that matches the best ask *)
   let incoming =
     Order.create
-      { symbol = aapl
-      ; participant = alice
+      { client_order_id = Client_order_id.of_int (n + 1)
+      ; symbol = aapl
       ; side = Buy
       ; price = Price.of_int_cents (min_price + n)
       ; size = Size.of_int 100
       ; time_in_force = Ioc
       }
       ~order_id:(Order_id.Generator.next gen)
+      ~participant:alice
   in
   Bench.Test.create ~name:[%string "find_match (n=%{n#Int})"] (fun () ->
     ignore (Order_book.find_match book incoming : Order.t option))
@@ -116,14 +119,15 @@ let bench_find_match_no_cross ~n =
   (* Incoming buy at a price below all asks — no match possible *)
   let incoming =
     Order.create
-      { symbol = aapl
-      ; participant = alice
+      { client_order_id = Client_order_id.of_int (n + 1)
+      ; symbol = aapl
       ; side = Buy
       ; price = Price.of_int_cents (min_price - 1)
       ; size = Size.of_int 100
       ; time_in_force = Ioc
       }
       ~order_id:(Order_id.Generator.next gen)
+      ~participant:alice
   in
   Bench.Test.create ~name:[%string "find_match_miss (n=%{n#Int})"] (fun () ->
     ignore (Order_book.find_match book incoming : Order.t option))
@@ -141,14 +145,15 @@ let bench_add_remove ~n =
   let book, gen = book_with_n_asks ~min_price n in
   let order =
     Order.create
-      { symbol = aapl
-      ; participant = alice
+      { client_order_id = Client_order_id.of_int 1
+      ; symbol = aapl
       ; side = Sell
       ; price = Price.of_int_cents (min_price + 500)
       ; size = Size.of_int 100
       ; time_in_force = Day
       }
       ~order_id:(Order_id.Generator.next gen)
+      ~participant:alice
   in
   let oid = Order.order_id order in
   Bench.Test.create ~name:[%string "add+remove (n=%{n#Int})"] (fun () ->
@@ -174,8 +179,9 @@ let bench_submit_ioc_cross ~n =
        let events =
          Matching_engine.submit
            engine
-           { symbol = aapl
-           ; participant = alice
+           ~participant:alice
+           { client_order_id = Client_order_id.of_int 1
+           ; symbol = aapl
            ; side = Buy
            ; price = Price.of_int_cents max_price
            ; size = Size.of_int 100
@@ -187,8 +193,9 @@ let bench_submit_ioc_cross ~n =
        ignore
          (Matching_engine.submit
             engine
-            { symbol = aapl
-            ; participant = bob
+            ~participant:bob
+            { client_order_id = Client_order_id.of_int 1
+            ; symbol = aapl
             ; side = Sell
             ; price = Price.of_int_cents !next_price
             ; size = Size.of_int 100
@@ -206,8 +213,9 @@ let bench_submit_ioc_no_match ~n =
     ignore
       (Matching_engine.submit
          engine
-         { symbol = aapl
-         ; participant = alice
+         ~participant:alice
+         { client_order_id = Client_order_id.of_int 1
+         ; symbol = aapl
          ; side = Buy
          ; price = Price.of_int_cents (min_price - 1)
          ; size = Size.of_int 100
@@ -225,8 +233,9 @@ let bench_submit_sweep ~n =
     ignore
       (Matching_engine.submit
          !engine
-         { symbol = aapl
-         ; participant = alice
+         ~participant:alice
+         { client_order_id = Client_order_id.of_int 1
+         ; symbol = aapl
          ; side = Buy
          ; price = Price.of_int_cents 99_999
          ; size = Size.of_int (n * 100)
@@ -246,14 +255,15 @@ let bench_find_match_alloc ~n =
   let book, gen = book_with_n_asks ~min_price n in
   let incoming =
     Order.create
-      { symbol = aapl
-      ; participant = alice
+      { client_order_id = Client_order_id.of_int (n + 1)
+      ; symbol = aapl
       ; side = Buy
       ; price = Price.of_int_cents (min_price + n)
       ; size = Size.of_int 100
       ; time_in_force = Ioc
       }
       ~order_id:(Order_id.Generator.next gen)
+      ~participant:alice
   in
   (* Measure minor-heap allocations *)
   let measure_alloc f =

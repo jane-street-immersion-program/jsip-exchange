@@ -6,11 +6,13 @@ type t =
   { market_data_subscribers_by_symbol :
       Exchange_event.t Pipe.Writer.t Bag.t Symbol.Table.t
   ; audit_subscribers : Exchange_event.t Pipe.Writer.t Bag.t
+  ; sessions : Session.t Participant.Table.t
   }
 
 let create () =
   { market_data_subscribers_by_symbol = Symbol.Table.create ()
   ; audit_subscribers = Bag.create ()
+  ; sessions = Participant.Table.create ()
   }
 ;;
 
@@ -61,14 +63,31 @@ let push_audit t event =
     Pipe.write_without_pushback_if_open writer event)
 ;;
 
+let clean_up_session t session =
+  Session.close session;
+  Hashtbl.remove t.sessions (Session.participant session)
+;;
+
+let set_up_session t participant =
+  let add_session () =
+    let session = Session.create participant in
+    Hashtbl.add_exn t.sessions ~key:participant ~data:session;
+    session
+  in
+  match Hashtbl.find t.sessions participant with
+  | None -> add_session ()
+  | Some session ->
+    [%log.info
+      "Session already exists. Cleaning up..." (participant : Participant.t)];
+    clean_up_session t session;
+    [%log.info "Creating a new session..."];
+    add_session ()
+;;
+
 let push_to_session t participant event =
-  (* TODO: Once sessions have been implemented this function should write the
-     event to the appropriate session's pipe. For now we have the server
-     binary print these events to stdout while tests can silence them. *)
-  ignore t;
-  print_endline
-    [%string
-      "[for %{participant#Participant}] %{Protocol.format_event event}"]
+  match Hashtbl.find t.sessions participant with
+  | None -> ()
+  | Some session -> Session.push session event
 ;;
 
 let dispatch_event t (event : Exchange_event.t) =
@@ -78,11 +97,13 @@ let dispatch_event t (event : Exchange_event.t) =
     push_market_data t event symbol
   | Trade_report { symbol; price = _; size = _ } ->
     push_market_data t event symbol
-  | Order_accept { order_id = _; request }
-  | Order_reject { request; reason = _ } ->
-    push_to_session t request.participant event
+  | Order_accept { order_id = _; participant; request = _ }
+  | Order_reject { request = _; participant; reason = _ }
+  | Cancel_reject { participant; reason = _; client_order_id = _ } ->
+    push_to_session t participant event
   | Order_cancel
       { order_id = _
+      ; client_order_id = _
       ; participant
       ; symbol = _
       ; remaining_size = _
@@ -95,9 +116,11 @@ let dispatch_event t (event : Exchange_event.t) =
       ; price = _
       ; size = _
       ; aggressor_order_id = _
+      ; aggressor_client_order_id = _
       ; aggressor_participant
       ; aggressor_side = _
       ; resting_order_id = _
+      ; resting_client_order_id = _
       ; resting_participant
       } ->
     push_to_session t aggressor_participant event;
