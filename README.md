@@ -1,7 +1,5 @@
 # JSIP Exchange
 
-Testing branch protection.
-
 A simplified stock exchange built in OCaml. Over the course of this project
 you will extend and improve every layer of the system — from the core data
 structures to the network protocol.
